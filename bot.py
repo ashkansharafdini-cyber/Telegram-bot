@@ -2,11 +2,22 @@ import os
 import logging
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
-import anthropic
+import google.generativeai as genai
 
 # ── تنظیمات ──────────────────────────────────────────────
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "YOUR_ANTHROPIC_API_KEY")
+TELEGRAM_TOKEN = "8863821301:AAEs75IKSu-1aqqVJejWqu4_aI1-idI-kmA"
+GEMINI_API_KEY = "AQ.Ab8RN6I0MLXWFyUmqJuDLmFikX5l8ykLTf9fiNiBVGeaM70jsw"
+
+# ── تنظیم Gemini ──────────────────────────────────────────
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel(
+    model_name="gemini-1.5-flash",
+    system_instruction=(
+        "تو یک دستیار هوشمند فارسی‌زبان هستی. "
+        "پاسخ‌های واضح، مفید و دوستانه به فارسی بده. "
+        "اگه سوال به زبان دیگه‌ای بود، به همون زبان جواب بده."
+    )
+)
 
 # ── لاگ‌گیری ──────────────────────────────────────────────
 logging.basicConfig(
@@ -15,11 +26,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ── کلاینت Anthropic ──────────────────────────────────────
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-
 # ── نگه‌داری تاریخچه مکالمه برای هر کاربر ──────────────
-conversation_history: dict[int, list] = {}
+chat_sessions: dict[int, any] = {}
 
 # ── هندلر /start ──────────────────────────────────────────
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -30,11 +38,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "هر سوالی داری بپرس، خوشحال می‌شم کمک کنم! 🤖"
     )
 
-# ── هندلر /clear (پاک کردن تاریخچه) ─────────────────────
+# ── هندلر /clear ──────────────────────────────────────────
 async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    conversation_history.pop(user_id, None)
-    await update.message.reply_text("✅ تاریخچه مکالمه پاک شد. می‌تونی از نو شروع کنی!")
+    chat_sessions.pop(user_id, None)
+    await update.message.reply_text("✅ تاریخچه مکالمه پاک شد!")
 
 # ── هندلر /help ───────────────────────────────────────────
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -52,43 +60,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_text = update.message.text
 
-    # نمایش "در حال تایپ..."
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
 
-    # اضافه کردن پیام کاربر به تاریخچه
-    if user_id not in conversation_history:
-        conversation_history[user_id] = []
-
-    conversation_history[user_id].append({
-        "role": "user",
-        "content": user_text
-    })
-
-    # محدود کردن تاریخچه به ۲۰ پیام آخر
-    if len(conversation_history[user_id]) > 20:
-        conversation_history[user_id] = conversation_history[user_id][-20:]
-
     try:
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=1024,
-            system=(
-                "تو یک دستیار هوشمند فارسی‌زبان هستی. "
-                "پاسخ‌های واضح، مفید و دوستانه به فارسی بده. "
-                "اگر سوال به زبان دیگه‌ای بود، به همون زبان جواب بده."
-            ),
-            messages=conversation_history[user_id]
-        )
+        if user_id not in chat_sessions:
+            chat_sessions[user_id] = model.start_chat(history=[])
 
-        assistant_reply = response.content[0].text
+        chat = chat_sessions[user_id]
+        response = chat.send_message(user_text)
+        reply = response.text
 
-        # اضافه کردن پاسخ به تاریخچه
-        conversation_history[user_id].append({
-            "role": "assistant",
-            "content": assistant_reply
-        })
-
-        await update.message.reply_text(assistant_reply)
+        await update.message.reply_text(reply)
 
     except Exception as e:
         logger.error(f"خطا: {e}")
