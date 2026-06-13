@@ -5,8 +5,8 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, fil
 import google.generativeai as genai
 
 # ── تنظیمات ──────────────────────────────────────────────
-TELEGRAM_TOKEN = "8863821301:AAEs75IKSu-1aqqVJejWqu4_aI1-idI-kmA"
-GEMINI_API_KEY = "AQ.Ab8RN6I0MLXWFyUmqJuDLmFikX5l8ykLTf9fiNiBVGeaM70jsw"
+TELEGRAM_TOKEN = "8863821301:-1aqqVJejWqu4_aI1-idI-kmA"
+GEMINI_API_KEY = "AQ.RN6I0MLXWFyUmqJuDLmFikX5l8ykLTf9fiNiBVGeaM70jsw"
 
 # ── تنظیم Gemini ──────────────────────────────────────────
 genai.configure(api_key=GEMINI_API_KEY)
